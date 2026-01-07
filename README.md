@@ -42,7 +42,7 @@ Unlike simple byte-to-byte comparison, our "Advanced Image Scan" uses a sophisti
 ```bash
 # Clone the repository
 git clone https://github.com/soainhobe/CheckDuplicateImages.git
-cd CheckDuplicate
+cd CheckDuplicateImages
 
 # Run in Debug mode
 dotnet run
