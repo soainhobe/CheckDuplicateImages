@@ -11,36 +11,37 @@ namespace CheckDuplicate.Services.Strategies;
 public class SmartScanStrategy : IScanStrategy
 {
     private readonly IFileCacheService? _cacheService;
+    private long _lastReportTime;
 
     public SmartScanStrategy(IFileCacheService? cacheService = null)
     {
         _cacheService = cacheService;
     }
 
-    public async Task<IList<DuplicateFileItem>> ScanAsync(IEnumerable<string> paths, ScanConfiguration config, System.IProgress<double>? progress = null)
+    public async Task<IList<DuplicateFileItem>> ScanAsync(IEnumerable<string> paths, ScanConfiguration config, System.IProgress<ScanProgress>? progress = null)
     {
+        progress?.Report(new ScanProgress { ProcessedCount = 0, TotalCount = 0, CurrentFile = "Initializing..." });
         var result = new List<DuplicateFileItem>();
 
         // 1. Collect
         var allFiles = CollectFiles(paths, config);
+        int totalFiles = allFiles.Count;
+        
+        progress?.Report(new ScanProgress { ProcessedCount = 0, TotalCount = totalFiles, CurrentFile = "Grouping by size..." });
 
         // 2. Group by Size (Quick Filter) - Ignore Name to find renamed duplicates
         var sizeNameGroups = allFiles.GroupBy(f => f.Length).ToList();
 
-        var duplicates = new ConcurrentBag<FileInfo>();
-        var singles = new ConcurrentBag<FileInfo>();
-
         // 3. Process suspects
-        int totalFiles = allFiles.Count;
         int processedCount = 0;
 
         foreach (var group in sizeNameGroups)
         {
             if (group.Count() == 1)
             {
-                singles.Add(group.First());
-                int p = System.Threading.Interlocked.Increment(ref processedCount);
-                if (totalFiles > 0) progress?.Report((double)p / totalFiles * 100);
+                // Single file by size -> Not a duplicate. 
+                // Don't track it to save memory.
+                processProgress();
                 continue;
             }
 
@@ -92,12 +93,11 @@ public class SmartScanStrategy : IScanStrategy
                 }
                 catch
                 {
-                    singles.Add(file);
+                    // Ignore errors
                 }
                 finally
                 {
-                    int p = System.Threading.Interlocked.Increment(ref processedCount);
-                    if (totalFiles > 0) progress?.Report((double)p / totalFiles * 100);
+                    processProgress();
                 }
             });
 
@@ -110,22 +110,42 @@ public class SmartScanStrategy : IScanStrategy
 
                     foreach (var f in hashGroup.Value) 
                     {
-                        result.Add(MapToItem(f, "Duplicate File", detailsGroup, true));
+                        lock(result)
+                        {
+                            result.Add(MapToItem(f, "Duplicate File", detailsGroup, true));
+                        }
                     }
-                }
-                else
-                {
-                    // Name/Size matched, but Content differed -> Not a duplicate
-                    foreach (var f in hashGroup.Value) singles.Add(f);
                 }
             }
         }
 
-        // 4. Map
-        // Duplicates added
-        foreach (var f in singles) result.Add(MapToItem(f, "Single file", string.Empty, false));
-
         return result;
+
+        // Local helper for progress to deduplicate code
+        void processProgress()
+        {
+            int p = System.Threading.Interlocked.Increment(ref processedCount);
+            
+            // Throttling: only report every 100ms or if complete
+            long now = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            long last = System.Threading.Interlocked.Read(ref _lastReportTime);
+            
+            if (now - last > 100 || p == totalFiles)
+            {
+                if (now - last > 100) 
+                {
+                    long original = System.Threading.Interlocked.Exchange(ref _lastReportTime, now);
+                    if (now - original > 100 || p == totalFiles)
+                    {
+                        progress?.Report(new ScanProgress { ProcessedCount = p, TotalCount = totalFiles, CurrentFile = "Scanning..." });
+                    }
+                }
+                else if (p == totalFiles)
+                {
+                     progress?.Report(new ScanProgress { ProcessedCount = p, TotalCount = totalFiles, CurrentFile = "Complete" });
+                }
+            }
+        }
     }
 
     private List<FileInfo> CollectFiles(IEnumerable<string> paths, ScanConfiguration config)

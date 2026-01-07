@@ -6,5 +6,5 @@ namespace CheckDuplicate.Services.Strategies;
 
 public interface IScanStrategy
 {
-    Task<IList<DuplicateFileItem>> ScanAsync(IEnumerable<string> paths, ScanConfiguration config, System.IProgress<double>? progress = null);
+    Task<IList<DuplicateFileItem>> ScanAsync(IEnumerable<string> paths, ScanConfiguration config, System.IProgress<ScanProgress>? progress = null);
 }

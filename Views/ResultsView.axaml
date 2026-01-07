@@ -4,6 +4,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:CheckDuplicate.ViewModels"
              xmlns:cv="using:CheckDuplicate.Converters"
+             xmlns:models="using:CheckDuplicate.Models"
+             xmlns:collections="using:Avalonia.Collections"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="600"
              x:Class="CheckDuplicate.Views.ResultsView"
              x:DataType="vm:ResultsViewModel"
@@ -47,7 +49,7 @@
         <!-- Hide Group Header if Key is Empty (for Single Files Level 2) -->
         <!-- Highlight 'Single file' Group Header -->
         <!-- Highlight 'Single file' Group Header -->
-        <Style Selector="DataGridRowGroupHeader" x:CompileBindings="False">
+        <Style Selector="DataGridRowGroupHeader" x:DataType="collections:DataGridCollectionViewGroup">
             <Setter Property="Background" Value="#1E1E2E"/>
             <Setter Property="Foreground" Value="#E0E0E0"/>
             <Setter Property="IsVisible" Value="{Binding Key, Converter={StaticResource StringNotEmptyToBoolConverter}}"/>
@@ -78,6 +80,7 @@
 
         <!-- Results DataGrid -->
         <DataGrid Grid.Row="2" 
+                  x:Name="ResultsGrid"
                   ItemsSource="{Binding ItemsView}"
                   AutoGenerateColumns="False"
                   IsReadOnly="True"
@@ -85,14 +88,13 @@
                   Background="Transparent"
                   BorderThickness="0"
                   HeadersVisibility="Column"
-                  RowBackground="Transparent"
-                  x:CompileBindings="False">
+                  RowBackground="Transparent">
             
             <DataGrid.Columns>
                 <!-- File Name with Icon/Image logic -->
                 <DataGridTemplateColumn Header="File Name" Width="1.5*">
                     <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
+                        <DataTemplate x:DataType="models:DuplicateFileItem">
                             <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                                 <!-- Default Icon if NOT Image -->
                                 <TextBlock Text="📄" Foreground="{DynamicResource PrimaryBlueBrush}"
@@ -110,24 +112,46 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTextColumn Header="File Location" Binding="{Binding FileLocation}" Width="2*"/>
-                <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="Auto"/>
-                <DataGridTextColumn Header="Created Date" Binding="{Binding CreatedDate}" Width="Auto"/>
+                <DataGridTemplateColumn Header="File Location" Width="2*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate x:DataType="models:DuplicateFileItem">
+                            <TextBlock Text="{Binding FileLocation}" VerticalAlignment="Center"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Size" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate x:DataType="models:DuplicateFileItem">
+                            <TextBlock Text="{Binding Size}" VerticalAlignment="Center"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Created Date" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate x:DataType="models:DuplicateFileItem">
+                            <TextBlock Text="{Binding CreatedDate}" VerticalAlignment="Center"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 
                 <DataGridTemplateColumn Header="Actions" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal" Spacing="10">
+                        <DataTemplate x:DataType="models:DuplicateFileItem">
+                            <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
                                 <!-- Removed direct delete button -->
                                 <Button Content="..." Background="Transparent" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0">
                                     <Button.Flyout>
                                         <MenuFlyout>
                                             <MenuItem Header="Open Folder" 
-                                                      Command="{Binding $parent[UserControl].DataContext.OpenFolderCommand}"
+                                                      Command="{Binding $parent[UserControl].((vm:ResultsViewModel)DataContext).OpenFolderCommand}"
+                                                      CommandParameter="{Binding .}"/>
+                                            <Separator/>
+                                            <MenuItem Header="Remove from Group"
+                                                      Command="{Binding $parent[UserControl].((vm:ResultsViewModel)DataContext).RemoveFromGroupCommand}"
                                                       CommandParameter="{Binding .}"/>
                                             <Separator/>
                                             <MenuItem Header="Delete File (Recycle Bin)" 
-                                                      Command="{Binding $parent[UserControl].DataContext.DeleteFileCommand}"
+                                                      Command="{Binding $parent[UserControl].((vm:ResultsViewModel)DataContext).DeleteFileCommand}"
                                                       CommandParameter="{Binding .}"
                                                       Foreground="Red"/>
                                         </MenuFlyout>

@@ -17,12 +17,15 @@ public class ContentScanStrategy : IScanStrategy
         _cacheService = cacheService;
     }
 
-    public async Task<IList<DuplicateFileItem>> ScanAsync(IEnumerable<string> paths, ScanConfiguration config, System.IProgress<double>? progress = null)
+    public async Task<IList<DuplicateFileItem>> ScanAsync(IEnumerable<string> paths, ScanConfiguration config, System.IProgress<ScanProgress>? progress = null)
     {
+        progress?.Report(new ScanProgress { ProcessedCount = 0, TotalCount = 0, CurrentFile = "Initializing..." });
         var result = new List<DuplicateFileItem>();
 
         // 1. Collect
         var allFiles = CollectFiles(paths, config);
+        int totalFilesCount = allFiles.Count;
+        progress?.Report(new ScanProgress { ProcessedCount = 0, TotalCount = totalFilesCount, CurrentFile = "Grouping by size..." });
 
         // 2. Group by Size (Optimization)
         var sizeGroups = allFiles.GroupBy(f => f.Length).ToList();
@@ -30,34 +33,26 @@ public class ContentScanStrategy : IScanStrategy
         var duplicates = new ConcurrentBag<FileInfo>();
         var singles = new ConcurrentBag<FileInfo>();
 
+        int processedGlobal = 0;
+
         // 3. Process groups
         foreach (var group in sizeGroups)
         {
             if (group.Count() == 1)
             {
                 singles.Add(group.First());
+                int p = System.Threading.Interlocked.Increment(ref processedGlobal);
+                // Report occasionally? Or every time? For smooth UI let's report e.g. every 10 or 100
+                if (p % 10 == 0 || p == totalFilesCount)
+                     progress?.Report(new ScanProgress { ProcessedCount = p, TotalCount = totalFilesCount, CurrentFile = group.First().Name });
                 continue;
             }
 
             // Calculate Hash
             var fileHashes = new ConcurrentDictionary<string, List<FileInfo>>();
-            int totalFiles = sizeGroups.Sum(g => g.Count());
-            int processed = 0;
-
+            
             await Parallel.ForEachAsync(group, async (file, ct) =>
             {
-                // Increment processed count atomically
-                System.Threading.Interlocked.Increment(ref processed);
-                // Report progress sparingly or every X items to avoid UI lag, but for simplicity:
-                // Calculate percentage relative to total files (Wait, 'processed' is local to this group effectively or overall?)
-                // Actually, totalFiles is wrong here. 'group' is just one group.
-                // Scan logic iterates groups sequentially, but inside group it's parallel.
-                // To do global progress, I need total count of ALL files first.
-                // 'allFiles.Count' is available at step 1.
-                // So I should initialize 'processed' outside loop.
-                // But I can't easily share 'processed' across this structure without passing it or changing structure.
-                // Wait, 'processed' needs to be outside loop.
-                
                 try
                 {
                     string hash = string.Empty;
@@ -104,6 +99,12 @@ public class ContentScanStrategy : IScanStrategy
                     // Failed to read, treat as single or error
                     singles.Add(file);
                 }
+                finally
+                {
+                    int p = System.Threading.Interlocked.Increment(ref processedGlobal);
+                    if (p % 5 == 0 || p == totalFilesCount)
+                         progress?.Report(new ScanProgress { ProcessedCount = p, TotalCount = totalFilesCount, CurrentFile = file.Name });
+                }
             });
 
             foreach (var hashGroup in fileHashes)
@@ -134,6 +135,7 @@ public class ContentScanStrategy : IScanStrategy
             result.Add(MapToItem(f, "Single file", string.Empty, false));
         }
 
+        progress?.Report(new ScanProgress { ProcessedCount = totalFilesCount, TotalCount = totalFilesCount, CurrentFile = "Complete" });
         return result;
     }
 

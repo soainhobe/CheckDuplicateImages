@@ -37,7 +37,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public MainWindowViewModel()
     {
         _serviceProvider = null!;
-        _currentPage = new ResultsViewModel(null!, null!, null!);
+        _currentPage = new ResultsViewModel(null!, null!, null!, null!);
     }
 
     [RelayCommand]

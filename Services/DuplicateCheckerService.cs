@@ -20,7 +20,7 @@ public class DuplicateCheckerService : IDuplicateCheckerService
         _ = _cacheService.LoadAsync();
     }
 
-    public async Task<IList<DuplicateFileItem>> ScanAsync(ScanConfiguration config, IProgress<double>? progress = null)
+    public async Task<IList<DuplicateFileItem>> ScanAsync(ScanConfiguration config, IProgress<ScanProgress>? progress = null)
     {
         IScanStrategy strategy = config.Method switch
         {
@@ -31,7 +31,7 @@ public class DuplicateCheckerService : IDuplicateCheckerService
             _ => new SmartScanStrategy(_cacheService)
         };
 
-        var results = await strategy.ScanAsync(config.SearchPaths, config, progress);
+        var results = await Task.Run(() => strategy.ScanAsync(config.SearchPaths, config, progress));
         
         // Auto-save cache after scan to persist new results
         await _cacheService.SaveAsync();

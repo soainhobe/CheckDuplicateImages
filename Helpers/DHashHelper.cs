@@ -18,6 +18,7 @@ public static class DHashHelper
         public ulong FlippedHash { get; set; }
         public ulong CenterHash { get; set; }
         public ulong[] SubRegions { get; set; } // [0]Left, [1]Right, [2]Top, [3]Bottom, [4]Center50
+        public uint AverageColor { get; set; } // 0xAARRGGBB
     }
 
     public static async Task<ImageHashes> ComputeHashesAsync(string filePath)
@@ -39,15 +40,20 @@ public static class DHashHelper
                 
                 try
                 {
-                    // 1. Auto-Trim Transparency using the working bitmap
+                    // 1. Auto-Trim Transparency
                     using var trimmed = TrimTransparency(bitmapForTrim);
                     
                     // Use trimmed source if valid, else the working bitmap
                     var sourceToResize = trimmed ?? bitmapForTrim;
-                    
+
+                    // FIX: Composite on WHITE background to handle transparency correctly
+                    // Otherwise transparent pixels might become black in Grayscale conversion, creating false positives.
+                    using var opaqueBitmap = RemoveTransparency(sourceToResize);
+                    var finalSource = opaqueBitmap; 
+
                     // 2. Compute Global Hashes from the optimized source
                     var info = new SKImageInfo(Width, Height, SKColorType.Gray8);
-                    using var resized = sourceToResize.Resize(info, sampling);
+                    using var resized = finalSource.Resize(info, sampling);
                     
                     ulong normalHash = 0;
                     ulong flippedHash = 0;
@@ -64,10 +70,11 @@ public static class DHashHelper
                     }
     
                     // 2. Compute Center Hash (Loose 75%)
-                    int w = sourceToResize.Width;
-                    int h = sourceToResize.Height;
+                    // Use finalSource (opaque) for all subsequent checks
+                    int w = finalSource.Width;
+                    int h = finalSource.Height;
                     
-                    centerHash = ComputeCropHash(sourceToResize, info, sampling, 
+                    centerHash = ComputeCropHash(finalSource, info, sampling, 
                         (int)(w * 0.75), (int)(h * 0.75), (w - (int)(w * 0.75)) / 2, (h - (int)(h * 0.75)) / 2);
 
                     // 3. Compute High-Density SubRegions
@@ -76,10 +83,10 @@ public static class DHashHelper
                         // A. 2x2 Grid (Quarters) -> Indices 0-3
                         int halfW = w / 2;
                         int halfH = h / 2;
-                        subRegions[0] = ComputeCropHash(sourceToResize, info, sampling, halfW, halfH, 0, 0); // TL
-                        subRegions[1] = ComputeCropHash(sourceToResize, info, sampling, w - halfW, halfH, halfW, 0); // TR
-                        subRegions[2] = ComputeCropHash(sourceToResize, info, sampling, halfW, h - halfH, 0, halfH); // BL
-                        subRegions[3] = ComputeCropHash(sourceToResize, info, sampling, w - halfW, h - halfH, halfW, halfH); // BR
+                        subRegions[0] = ComputeCropHash(finalSource, info, sampling, halfW, halfH, 0, 0); // TL
+                        subRegions[1] = ComputeCropHash(finalSource, info, sampling, w - halfW, halfH, halfW, 0); // TR
+                        subRegions[2] = ComputeCropHash(finalSource, info, sampling, halfW, h - halfH, 0, halfH); // BL
+                        subRegions[3] = ComputeCropHash(finalSource, info, sampling, w - halfW, h - halfH, halfW, halfH); // BR
                         
                         // B. 3x3 Grid (Thirds) -> Indices 4-12
                         int thirdW = w / 3;
@@ -93,7 +100,7 @@ public static class DHashHelper
                                 {
                                     int cw = (c == 2) ? (w - 2 * thirdW) : thirdW; // Handle reminder on last col
                                     int ch = (r == 2) ? (h - 2 * thirdH) : thirdH; // Handle reminder on last row
-                                    subRegions[4 + r * 3 + c] = ComputeCropHash(sourceToResize, info, sampling, cw, ch, c * thirdW, r * thirdH);
+                                    subRegions[4 + r * 3 + c] = ComputeCropHash(finalSource, info, sampling, cw, ch, c * thirdW, r * thirdH);
                                 }
                             }
                         }
@@ -101,20 +108,30 @@ public static class DHashHelper
                         // C. Center 50% (Tight Subject) -> Index 13
                         int tightW = (int)(w * 0.5);
                         int tightH = (int)(h * 0.5);
-                        subRegions[13] = ComputeCropHash(sourceToResize, info, sampling, tightW, tightH, (w - tightW)/2, (h - tightH)/2);
+                        subRegions[13] = ComputeCropHash(finalSource, info, sampling, tightW, tightH, (w - tightW)/2, (h - tightH)/2);
                     }
     
+                    // 2.5 Compute Average Color
+                    uint avgColor = CalculateAverageColor(finalSource);
+
                     return new ImageHashes 
                     { 
                         NormalHash = normalHash, 
                         FlippedHash = flippedHash,
                         CenterHash = centerHash,
-                        SubRegions = subRegions
+                        SubRegions = subRegions,
+                        AverageColor = avgColor
                     };
                 }
                 finally
                 {
                     scaledBitmap?.Dispose();
+                    // Dispose opaqueBitmap if it was created
+                    // It's implicitly disposed by the 'using' statement if it was created.
+                    // If 'trimmed' was null, 'sourceToResize' would be 'bitmapForTrim', and 'opaqueBitmap' would be created from it.
+                    // If 'trimmed' was not null, 'sourceToResize' would be 'trimmed', and 'opaqueBitmap' would be created from it.
+                    // In both cases, 'opaqueBitmap' is a new SKBitmap and needs disposal.
+                    // The 'using' statement handles it.
                 }
                 
 
@@ -124,6 +141,23 @@ public static class DHashHelper
                 return new ImageHashes();
             }
         });
+    }
+
+    // Helper: Composite bitmap over white background to remove transparency
+    private static SKBitmap RemoveTransparency(SKBitmap source)
+    {
+        // New bitmap with same dimensions, opaque
+        var opaque = new SKBitmap(source.Width, source.Height, SKColorType.Bgra8888, SKAlphaType.Opaque);
+        
+        using (var canvas = new SKCanvas(opaque))
+        {
+            // Fill white
+            canvas.Clear(SKColors.White);
+            // Draw source over it
+            canvas.DrawBitmap(source, 0, 0);
+        }
+        
+        return opaque;
     }
 
     // Helper: Finds the bounding box of non-transparent pixels and crops it
@@ -288,5 +322,85 @@ public static class DHashHelper
     {
         ulong xor = a ^ b;
         return System.Numerics.BitOperations.PopCount(xor);
+    }
+
+    // Euclidean distance in RGB space
+    public static double ColorDistance(uint c1, uint c2)
+    {
+        // Extract A,R,G,B components
+        // We ignore Alpha difference as we are using opaque white-backed images
+        
+        int r1 = (int)((c1 >> 16) & 0xFF);
+        int g1 = (int)((c1 >> 8) & 0xFF);
+        int b1 = (int)(c1 & 0xFF);
+        
+        int r2 = (int)((c2 >> 16) & 0xFF);
+        int g2 = (int)((c2 >> 8) & 0xFF);
+        int b2 = (int)(c2 & 0xFF);
+        
+        // Simple Euclidean
+        return Math.Sqrt(Math.Pow(r1 - r2, 2) + Math.Pow(g1 - g2, 2) + Math.Pow(b1 - b2, 2));
+    }
+
+    private static uint CalculateAverageColor(SKBitmap bitmap)
+    {
+        // Sample pixels to calculate average
+        // For speed, sample standard 9x8 or just traverse the bitmap with step if large
+        
+        long rSum = 0;
+        long gSum = 0;
+        long bSum = 0;
+        long count = 0;
+        
+        // Sampling step based on size to avoid reading millions of pixels
+        int step = 1;
+        if (bitmap.Width > 64 || bitmap.Height > 64) step = 4;
+        
+        int w = bitmap.Width;
+        int h = bitmap.Height;
+        
+        IntPtr pixelsAddr = bitmap.GetPixels();
+        
+        unsafe 
+        {
+            byte* ptr = (byte*)pixelsAddr;
+            int rowBytes = bitmap.RowBytes;
+
+            for (int y = 0; y < h; y += step)
+            {
+                byte* row = ptr + (y * rowBytes);
+                for (int x = 0; x < w; x += step)
+                {
+                    // BGRA (Little Endian uint) -> B is lowest byte
+                    byte* p = row + x * 4;
+                    byte b = p[0];
+                    byte g = p[1];
+                    byte r = p[2];
+                    
+                    // Filter out near-white background pixels to focus on the SUBJECT color
+                    // Since we composited on White, background is (255,255,255).
+                    // We ignore pixels that are very close to white (e.g., > 245 in all channels)
+                    // This prevents small objects on large white backgrounds from washing out to "White".
+                    if (r > 245 && g > 245 && b > 245)
+                    {
+                        continue;
+                    }
+                    
+                    bSum += b;
+                    gSum += g;
+                    rSum += r;
+                    count++;
+                }
+            }
+        }
+        
+        if (count == 0) return 0xFFFFFFFF; // White default
+        
+        byte rAvg = (byte)(rSum / count);
+        byte gAvg = (byte)(gSum / count);
+        byte bAvg = (byte)(bSum / count);
+        
+        // Return 0xAARRGGBB
+        return (uint)((0xFF << 24) | (rAvg << 16) | (gAvg << 8) | bAvg);
     }
 }

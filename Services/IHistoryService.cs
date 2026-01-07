@@ -6,10 +6,10 @@ namespace CheckDuplicate.Services;
 
 public interface IHistoryService
 {
-    Task SaveSessionAsync(HistorySession session);
-    Task<List<HistorySession>> LoadSessionsAsync();
+    Task SaveSessionAsync(Models.HistorySession session);
+    Task<System.Collections.Generic.List<Models.HistorySession>> LoadSessionsAsync();
+    Task<Models.HistorySession?> LoadSessionDetailsAsync(string id);
     Task DeleteSessionAsync(string id);
     
     event System.EventHandler<HistorySession>? SessionSaved;
 }
-

@@ -8,13 +8,16 @@ namespace CheckDuplicate.Services.Strategies;
 
 public class NameSizeScanStrategy : IScanStrategy
 {
-    public Task<IList<DuplicateFileItem>> ScanAsync(IEnumerable<string> paths, ScanConfiguration config, System.IProgress<double>? progress = null)
+    public Task<IList<DuplicateFileItem>> ScanAsync(IEnumerable<string> paths, ScanConfiguration config, System.IProgress<ScanProgress>? progress = null)
     {
-        progress?.Report(0);
+        progress?.Report(new ScanProgress { ProcessedCount = 0, TotalCount = 0, CurrentFile = "Initializing..." });
         var result = new List<DuplicateFileItem>();
         
         // 1. Collect all files
         var allFiles = CollectFiles(paths, config);
+        int totalFiles = allFiles.Count;
+        
+        progress?.Report(new ScanProgress { ProcessedCount = 0, TotalCount = totalFiles, CurrentFile = "Grouping files..." });
 
         // 2. Group by Name + Size -> Changed to Size Only as per request to find matches with different names
         var groups = allFiles
@@ -40,7 +43,7 @@ public class NameSizeScanStrategy : IScanStrategy
             }
         }
 
-        progress?.Report(100);
+        progress?.Report(new ScanProgress { ProcessedCount = totalFiles, TotalCount = totalFiles, CurrentFile = "Complete" });
         return Task.FromResult<IList<DuplicateFileItem>>(result);
     }
 

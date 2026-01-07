@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:CheckDuplicate.ViewModels"
+             xmlns:models="using:CheckDuplicate.Models"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="CheckDuplicate.Views.HistoryView"
              x:DataType="vm:HistoryViewModel"
@@ -23,7 +24,7 @@
                 
                 <ListBox Grid.Row="1" ItemsSource="{Binding Sessions}" SelectedItem="{Binding SelectedSession}" Background="Transparent">
                     <ListBox.ItemTemplate>
-                        <DataTemplate x:CompileBindings="False">
+                        <DataTemplate x:DataType="models:HistorySession">
                             <Grid ColumnDefinitions="*, Auto">
                                 <StackPanel Spacing="4">
                                     <TextBlock Text="{Binding Date}" FontWeight="SemiBold" Foreground="White"/>
@@ -37,7 +38,7 @@
                                 </StackPanel>
                                 
                                 <Button Grid.Column="1" Content="✕" 
-                                        Command="{Binding $parent[UserControl].DataContext.DeleteSessionCommand}" 
+                                        Command="{Binding $parent[UserControl].((vm:HistoryViewModel)DataContext).DeleteSessionCommand}" 
                                         CommandParameter="{Binding .}"
                                         Background="Transparent" Foreground="Red" Padding="5"/>
                             </Grid>
@@ -67,9 +68,27 @@
                            HeadersVisibility="Column"
                            RowBackground="Transparent">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="File Name" Binding="{Binding FileName}" Width="1.5*"/>
-                        <DataGridTextColumn Header="Path" Binding="{Binding FullPath}" Width="2*"/>
-                        <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="Auto"/>
+                        <DataGridTemplateColumn Header="File Name" Width="1.5*">
+                             <DataGridTemplateColumn.CellTemplate>
+                                 <DataTemplate x:DataType="models:DuplicateFileItem">
+                                     <TextBlock Text="{Binding FileName}" VerticalAlignment="Center"/>
+                                 </DataTemplate>
+                             </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Path" Width="2*">
+                             <DataGridTemplateColumn.CellTemplate>
+                                 <DataTemplate x:DataType="models:DuplicateFileItem">
+                                     <TextBlock Text="{Binding FullPath}" VerticalAlignment="Center"/>
+                                 </DataTemplate>
+                             </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Size" Width="Auto">
+                             <DataGridTemplateColumn.CellTemplate>
+                                 <DataTemplate x:DataType="models:DuplicateFileItem">
+                                     <TextBlock Text="{Binding Size}" VerticalAlignment="Center"/>
+                                 </DataTemplate>
+                             </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                     </DataGrid.Columns>
                  </DataGrid>
             </Grid>

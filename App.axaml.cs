@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using Avalonia;
 using Microsoft.Extensions.DependencyInjection;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -50,6 +51,7 @@ public partial class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 
+    [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "Safe to remove validators")]
     private void DisableAvaloniaDataAnnotationValidation()
     {
         // Get an array of plugins to remove

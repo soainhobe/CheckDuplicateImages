@@ -124,21 +124,24 @@ public partial class ScanOptionsViewModel : ViewModelBase
     public event Action<bool>? RequestClose;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsAdvancedImageScanAvailable))]
     private bool _checkImages = true;
     
     [ObservableProperty]
-    private bool _checkVideos = true;
+    private bool _checkVideos; // Default false
     
     [ObservableProperty]
-    private bool _checkDocuments = true;
+    private bool _checkDocuments; // Default false
     
     [ObservableProperty]
     private bool _checkMusic;
     
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsAdvancedImageScanAvailable))]
     private bool _checkOther;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsAdvancedImageScanAvailable))]
     private string _otherTypes = string.Empty;
 
     [ObservableProperty]
@@ -158,6 +161,22 @@ public partial class ScanOptionsViewModel : ViewModelBase
 
     [ObservableProperty]
     private int _comparisonStrengthIndex = 1; // Default to 1 (Loose)
+
+    public bool IsAdvancedImageScanAvailable
+    {
+        get
+        {
+            if (CheckImages) return true;
+            if (CheckOther && !string.IsNullOrWhiteSpace(OtherTypes))
+            {
+                var input = OtherTypes.ToLower();
+                var imageKeywords = new[] { "jpg", "jpeg", "png", "bmp", "gif", "webp", "tiff", "heic", "raw" };
+                // Simple check: if input contains any image extension
+                return System.Linq.Enumerable.Any(imageKeywords, ext => input.Contains(ext));
+            }
+            return false;
+        }
+    }
 
     public ScanOptionsViewModel()
     {

@@ -11,7 +11,8 @@ namespace CheckDuplicate.Services.Strategies;
 
 public class AdvancedImageScanStrategy : IScanStrategy
 {
-    private const int SimilarityThreshold = 5; // Configurable?
+    private const int SimilarityThreshold = 3; // Stricter threshold due to added Color Check
+    private const double ColorThreshold = 35.0; // Max color distance allowed
     private readonly IFileCacheService? _cacheService;
 
     public AdvancedImageScanStrategy(IFileCacheService? cacheService = null)
@@ -19,16 +20,14 @@ public class AdvancedImageScanStrategy : IScanStrategy
         _cacheService = cacheService;
     }
 
-    public async Task<IList<DuplicateFileItem>> ScanAsync(IEnumerable<string> paths, ScanConfiguration config, System.IProgress<double>? progress = null)
+    public async Task<IList<DuplicateFileItem>> ScanAsync(IEnumerable<string> paths, ScanConfiguration config, System.IProgress<ScanProgress>? progress = null)
     {
+        progress?.Report(new ScanProgress { ProcessedCount = 0, TotalCount = 0, CurrentFile = "Initializing..." });
         var result = new List<DuplicateFileItem>();
         
         // 1. Collect Image Files Only
-        // We force include images for this strategy regardless of config logic? 
-        // Or respect config? Config might have "IncludeImages = false".
-        // But user selected "Advanced Image Scan".
-        // We should likely collect ALL images.
-        var images = CollectImages(paths);
+        // Use user config to filter (respecting Other types if user specified extensions)
+        var images = CollectImages(paths, config);
         
         if (!images.Any()) return result;
 
@@ -37,14 +36,18 @@ public class AdvancedImageScanStrategy : IScanStrategy
         int totalImages = images.Count;
         int processed = 0;
         
+        progress?.Report(new ScanProgress { ProcessedCount = 0, TotalCount = totalImages, CurrentFile = "Computing hashes..." });
+
         await Parallel.ForEachAsync(images, async (file, ct) =>
         {
             try
             {
                 // Increment and report
                 int p = System.Threading.Interlocked.Increment(ref processed);
-                if (totalImages > 0) progress?.Report((double)p / totalImages * 100);
-            DHashHelper.ImageHashes hash = default;
+                if (p % 5 == 0 || p == totalImages) 
+                    progress?.Report(new ScanProgress { ProcessedCount = p, TotalCount = totalImages, CurrentFile = file.Name });
+
+                DHashHelper.ImageHashes hash = default;
             bool cached = false;
 
             // 1. Check Cache
@@ -118,6 +121,13 @@ public class AdvancedImageScanStrategy : IScanStrategy
             {
                 var pivot = g[0];
                 
+                // 0. Check Color Distance First (Fast reject)
+                // If average colors are very different, they are definitely not duplicates.
+                if (DHashHelper.ColorDistance(item.Hash.AverageColor, pivot.Hash.AverageColor) > ColorThreshold)
+                {
+                    continue; // Skip to next group
+                }
+
                 // Check Normal
                 if (DHashHelper.HammingDistance(item.Hash.NormalHash, pivot.Hash.NormalHash) <= SimilarityThreshold)
                 {
@@ -219,21 +229,16 @@ public class AdvancedImageScanStrategy : IScanStrategy
         return result;
     }
 
-    private List<FileInfo> CollectImages(IEnumerable<string> paths)
+    private List<FileInfo> CollectImages(IEnumerable<string> paths, ScanConfiguration config)
     {
         var files = new List<FileInfo>();
         var options = new EnumerationOptions { IgnoreInaccessible = true, RecurseSubdirectories = true };
         
-        // Custom simple config just for images
-        // We emulate a config that only allows images
-        var imgConfig = new ScanConfiguration 
-        { 
-            IncludeImages = true, 
-            IncludeVideos = false, 
-            IncludeMusic = false, 
-            IncludeDocuments = false, 
-            IncludeOther = false 
-        };
+        // We use the passed config. 
+        // Note: AdvancedImageScanStrategy requires images to work (to compute hashes).
+        // If config includes non-images (e.g. user checked Documents), they will be collected here,
+        // but subsequent steps (ComputeHashesAsync) will likely fail or return empty hashes for them.
+        // This is acceptable behavior: user asked to scan Documents with ImageStrategy -> result is nothing useful (or errors handled).
 
         foreach (var path in paths)
         {
@@ -243,7 +248,7 @@ public class AdvancedImageScanStrategy : IScanStrategy
                 {
                     var dirInfo = new DirectoryInfo(path);
                     var collected = dirInfo.EnumerateFiles("*", options);
-                    files.AddRange(Helpers.FileFilterHelper.ApplyFilters(collected, imgConfig));
+                    files.AddRange(Helpers.FileFilterHelper.ApplyFilters(collected, config));
                 }
                 catch { }
             }

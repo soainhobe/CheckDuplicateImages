@@ -75,7 +75,7 @@
                         <WrapPanel Orientation="Horizontal" ItemWidth="300">
                             <RadioButton Content="Content (CRC32/MD5)" IsChecked="{Binding UseContentComparison}"/>
                             <RadioButton Content="Name and Size" IsChecked="{Binding UseNameAndSize}"/>
-                            <RadioButton Content="Advanced Image Scan" IsChecked="{Binding UseAdvancedImageComparison}" IsVisible="{Binding CheckImages}"/>
+                            <RadioButton Content="Advanced Image Scan" IsChecked="{Binding UseAdvancedImageComparison}" IsVisible="{Binding IsAdvancedImageScanAvailable}"/>
                             <RadioButton Content="Auto (Smart)" IsChecked="{Binding UseAutoComparison}"/>
                         </WrapPanel>
                         

@@ -15,6 +15,7 @@ public partial class ResultsViewModel : ViewModelBase
     private readonly Services.IDuplicateCheckerService _duplicateCheckerService;
     private readonly Services.IFileService _fileService;
     private readonly Services.IHistoryService _historyService;
+    private readonly Services.IFileCacheService _cacheService;
     private ScanOptionsViewModel _scanOptionsViewModel;
 
     [ObservableProperty]
@@ -32,6 +33,10 @@ public partial class ResultsViewModel : ViewModelBase
 
     private List<DuplicateFileItem> _currentResults = new();
 
+    public ObservableCollection<DuplicateFileItem> DisplayedItems { get; } = new();
+    private int _loadedCount = 0;
+    private const int ChunkSize = 50;
+    
     public DataGridCollectionView ItemsView { get; set; }
 
     // Design-time or fallback
@@ -40,28 +45,48 @@ public partial class ResultsViewModel : ViewModelBase
          _duplicateCheckerService = null!;
          _fileService = null!;
          _historyService = null!;
+         _cacheService = null!;
          ItemsView = null!;
          _scanOptionsViewModel = new ScanOptionsViewModel();
     }
 
-    public ResultsViewModel(Services.IDuplicateCheckerService duplicateCheckerService, Services.IFileService fileService, Services.IHistoryService historyService)
+    public ResultsViewModel(Services.IDuplicateCheckerService duplicateCheckerService, Services.IFileService fileService, Services.IHistoryService historyService, Services.IFileCacheService cacheService)
     {
         _duplicateCheckerService = duplicateCheckerService;
         _fileService = fileService;
         _historyService = historyService;
+        _cacheService = cacheService;
         _scanOptionsViewModel = new ScanOptionsViewModel(); // Initialize with defaults
         
         // Listen to folder changes to update Command state
         _scanOptionsViewModel.Folders.CollectionChanged += (s, e) => StartNewScanCommand.NotifyCanExecuteChanged();
 
         // Initial Empty State
-        ItemsView = new DataGridCollectionView(new List<DuplicateFileItem>());
-        ItemsView.GroupDescriptions.Add(new DataGridPathGroupDescription("Category"));
+        ItemsView = new DataGridCollectionView(DisplayedItems);
         ItemsView.GroupDescriptions.Add(new DataGridPathGroupDescription("DetailsGroup"));
-        // Sort: Category (Duplicate < Single), then Details, then Name
-        ItemsView.SortDescriptions.Add(DataGridSortDescription.FromPath("Category", System.ComponentModel.ListSortDirection.Ascending));
         ItemsView.SortDescriptions.Add(DataGridSortDescription.FromPath("DetailsGroup", System.ComponentModel.ListSortDirection.Ascending));
         ItemsView.SortDescriptions.Add(DataGridSortDescription.FromPath("FileName", System.ComponentModel.ListSortDirection.Ascending));
+    }
+
+    [RelayCommand]
+    public void LoadMoreResults()
+    {
+        if (_loadedCount >= _currentResults.Count) return;
+
+        int nextCount = Math.Min(ChunkSize, _currentResults.Count - _loadedCount);
+        if (nextCount <= 0) return;
+
+        var nextBatch = _currentResults.GetRange(_loadedCount, nextCount);
+        
+        // Add to DisplayedItems
+        foreach (var item in nextBatch)
+        {
+            DisplayedItems.Add(item);
+        }
+
+        _loadedCount += nextCount;
+        
+        // StatusMessage = $"Showing {_loadedCount}/{_currentResults.Count}";
     }
 
     private bool CanStartNewScan => !IsScanning && _scanOptionsViewModel.Folders.Count > 0;
@@ -86,10 +111,10 @@ public partial class ResultsViewModel : ViewModelBase
                  return;
             }
 
-            var progress = new Progress<double>(p => 
+            var progress = new Progress<ScanProgress>(p => 
             {
-                ProgressValue = p;
-                StatusMessage = $"Scanning... {p:0}%";
+                ProgressValue = p.Percentage;
+                StatusMessage = $"Scanning... {p.ProcessedCount}/{p.TotalCount}";
             });
 
             var rawResults = await _duplicateCheckerService.ScanAsync(config, progress);
@@ -101,14 +126,20 @@ public partial class ResultsViewModel : ViewModelBase
             
             CalculateSpaceSaved();
 
+            CalculateSpaceSaved();
+
             // Update UI
-            ItemsView = new DataGridCollectionView(_currentResults);
-            ItemsView.GroupDescriptions.Add(new DataGridPathGroupDescription("DetailsGroup")); // Removed "Category" grouping as we only have duplicates
+            DisplayedItems.Clear();
+            _loadedCount = 0;
+            LoadMoreResults();
+
+            // ItemsView is already bound to DisplayedItems in Constructor.
+            // Just notify change if needed, or let ObservableCollection handle it.
+            // Note: IF we re-created ItemsView in previous logic, we must ensure we don't break the binding.
+            // But here we are NOT re-creating ItemsView, just updating the source collection.
             
-            // Apply Sort
-            // Sort by Group (DetailsGroup) then by Name
-            ItemsView.SortDescriptions.Add(DataGridSortDescription.FromPath("DetailsGroup", System.ComponentModel.ListSortDirection.Ascending));
-            ItemsView.SortDescriptions.Add(DataGridSortDescription.FromPath("FileName", System.ComponentModel.ListSortDirection.Ascending));
+            // To be safe and ensure Sort/Group descriptions are active on the View:
+            // ItemsView.Refresh(); // DataGridCollectionView might not have Refresh, but it reacts to CollectionChanged.
             
             OnPropertyChanged(nameof(ItemsView));
 
@@ -198,40 +229,62 @@ public partial class ResultsViewModel : ViewModelBase
         try 
         {
             _fileService.DeleteToRecycleBin(item.FullPath);
-            
-            // Remove from internal list
-            _currentResults.Remove(item);
-            
-            // Check if group still valid
-            // Find other items in same group
-            var groupItems = _currentResults.Where(x => x.DetailsGroup == item.DetailsGroup).ToList();
-            if (groupItems.Count == 1)
-            {
-                // Only 1 item left, no longer a duplicate. Remove it properly.
-                _currentResults.Remove(groupItems[0]);
-            }
-            
-            // Re-calculate space
-            CalculateSpaceSaved();
-            
-            // Refresh View
-            // Creating new view is easiest way to ensure groups update correctly
-            // and filters applied.
-            // Preserving sort order
-            var newView = new DataGridCollectionView(_currentResults);
-            newView.GroupDescriptions.Add(new DataGridPathGroupDescription("DetailsGroup"));
-            newView.SortDescriptions.Add(DataGridSortDescription.FromPath("DetailsGroup", System.ComponentModel.ListSortDirection.Ascending));
-            newView.SortDescriptions.Add(DataGridSortDescription.FromPath("FileName", System.ComponentModel.ListSortDirection.Ascending));
-            
-            ItemsView = newView;
-            OnPropertyChanged(nameof(ItemsView));
-
+            RemoveItemFromList(item);
             StatusMessage = $"Deleted: {item.FileName}";
         }
         catch (System.Exception ex)
         {
             StatusMessage = $"Delete Error: {ex.Message}";
         }
+    }
+
+    [RelayCommand]
+    private void RemoveFromGroup(DuplicateFileItem? item)
+    {
+        if (item == null) return;
+
+        try
+        {
+            RemoveItemFromList(item);
+            StatusMessage = $"Removed from group: {item.FileName}";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    private void RemoveItemFromList(DuplicateFileItem item)
+    {
+        // 0. Remove from Cache (So next scan treats it as fresh/unknown, triggering re-hash)
+        _cacheService.Remove(item.FullPath);
+
+        // 1. Remove from main source
+        _currentResults.Remove(item);
+        
+        // 2. Remove from UI collection (if loaded)
+        if (DisplayedItems.Contains(item))
+        {
+            DisplayedItems.Remove(item);
+        }
+        
+        // 3. Check for orphan (singleton in group)
+        var groupItems = _currentResults.Where(x => x.DetailsGroup == item.DetailsGroup).ToList();
+        if (groupItems.Count == 1)
+        {
+            var orphan = groupItems[0];
+            _currentResults.Remove(orphan);
+            if (DisplayedItems.Contains(orphan))
+            {
+                DisplayedItems.Remove(orphan);
+            }
+        }
+        
+        // 4. Update track count if needed (offsetting infinite scroll index)
+        if (_loadedCount > _currentResults.Count) _loadedCount = _currentResults.Count;
+
+        // 5. Update stats
+        CalculateSpaceSaved();
     }
 
     [RelayCommand(CanExecute = nameof(CanExport))]

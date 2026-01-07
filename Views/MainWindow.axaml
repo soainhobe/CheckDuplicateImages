@@ -47,23 +47,23 @@
                      
                      <Button Classes="NavBtn" Command="{Binding NavigateToHomeCommand}" Tag="{Binding IsHomeActive}">
                          <StackPanel Orientation="Horizontal" Spacing="10">
-                              <TextBlock Text="🏠"/>
-                              <TextBlock Text="Home"/>
+                              <TextBlock Text="🏠" FontSize="24" VerticalAlignment="Center"/>
+                              <TextBlock Text="Home" VerticalAlignment="Center"/>
                          </StackPanel>
                      </Button>
 
                       <Button Classes="NavBtn" Command="{Binding NavigateToHistoryCommand}" Tag="{Binding IsHistoryActive}">
                          <StackPanel Orientation="Horizontal" Spacing="10">
-                              <TextBlock Text="🕒"/>
-                              <TextBlock Text="History"/>
+                              <TextBlock Text="🕒" FontSize="24" VerticalAlignment="Center"/>
+                              <TextBlock Text="History" VerticalAlignment="Center"/>
                          </StackPanel>
                      </Button>
                  </StackPanel>
 
                  <Button Grid.Row="1" Classes="NavBtn" Command="{Binding NavigateToAboutCommand}" VerticalAlignment="Bottom" Tag="{Binding IsAboutActive}">
                      <StackPanel Orientation="Horizontal" Spacing="10">
-                          <TextBlock Text="ℹ"/>
-                          <TextBlock Text="About"/>
+                          <TextBlock Text="ℹ" FontSize="24" VerticalAlignment="Center"/>
+                          <TextBlock Text="About" VerticalAlignment="Center"/>
                      </StackPanel>
                  </Button>
              </Grid>

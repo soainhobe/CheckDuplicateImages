@@ -74,8 +74,25 @@ public partial class HistoryViewModel : ViewModelBase
         if (SelectedSession == session) SelectedSession = null;
     }
 
-    partial void OnSelectedSessionChanged(HistorySession? value)
+    async partial void OnSelectedSessionChanged(HistorySession? value)
     {
-        // Could trigger navigation or detail view update
+        if (value != null && (value.Items == null || value.Items.Count == 0))
+        {
+            // Lazy load items
+            // Show loading?
+            var fullSession = await _historyService.LoadSessionDetailsAsync(value.Id);
+            if (fullSession != null)
+            {
+                value.Items = fullSession.Items;
+                // Force UI update if needed. The collection inside 'value' changed.
+                // PropertyChanged for 'SelectedSession' might have already fired.
+                // If Items is bound, it needs notification.
+                // Since 'Items' is a property of HistorySession which might not observe changes,
+                // we might need to Refresh binding.
+                
+                // Hack: Re-set the property to trigger binding refresh
+                OnPropertyChanged(nameof(SelectedSession));
+            }
+        }
     }
 }

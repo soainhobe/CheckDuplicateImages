@@ -21,6 +21,7 @@ public interface IFileCacheService
     void AddOrUpdate(string filePath, DateTime lastWriteTime, long fileSize, string hashData);
     Task LoadAsync();
     Task SaveAsync();
+    void Remove(string filePath);
 }
 
 public class FileCacheService : IFileCacheService
@@ -43,22 +44,26 @@ public class FileCacheService : IFileCacheService
     {
         if (!File.Exists(_cacheFilePath)) return;
 
-        try
+        await Task.Run(async () =>
         {
-            using var stream = File.OpenRead(_cacheFilePath);
-            var list = await JsonSerializer.DeserializeAsync(stream, Serialization.AppJsonContext.Default.ListCacheEntry);
-            if (list != null)
+            try
             {
-                foreach (var item in list)
+                using var stream = File.OpenRead(_cacheFilePath);
+                var list = await JsonSerializer.DeserializeAsync(stream, Serialization.AppJsonContext.Default.ListCacheEntry);
+                if (list != null)
                 {
-                    _cache[item.FilePath] = item;
+                    // Populating dictionary can be CPU intensive for large lists
+                    foreach (var item in list)
+                    {
+                        _cache[item.FilePath] = item;
+                    }
                 }
             }
-        }
-        catch 
-        {
-            // Ignore corrupted cache
-        }
+            catch 
+            {
+                // Ignore corrupted cache
+            }
+        });
     }
 
     public async Task SaveAsync()
@@ -90,5 +95,10 @@ public class FileCacheService : IFileCacheService
             HashData = hashData
         };
         _cache[filePath] = entry;
+    }
+
+    public void Remove(string filePath)
+    {
+        _cache.TryRemove(filePath, out _);
     }
 }
