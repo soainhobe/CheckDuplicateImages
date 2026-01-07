@@ -1,0 +1,78 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:CheckDuplicate.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="CheckDuplicate.Views.HistoryView"
+             x:DataType="vm:HistoryViewModel"
+             Background="{DynamicResource AppBackgroundBrush}">
+    <UserControl.Styles>
+        <Style Selector="ListBoxItem">
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid ColumnDefinitions="300, *" Margin="20">
+        <!-- Left: Session List -->
+        <Border Grid.Column="0" Background="#1E1E2E" CornerRadius="8" Margin="0,0,20,0" Padding="10">
+            <Grid RowDefinitions="Auto, *">
+                <TextBlock Text="Past Scans" FontWeight="Bold" Foreground="White" Margin="0,0,0,10" FontSize="16"/>
+                
+                <ListBox Grid.Row="1" ItemsSource="{Binding Sessions}" SelectedItem="{Binding SelectedSession}" Background="Transparent">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:CompileBindings="False">
+                            <Grid ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="{Binding Date}" FontWeight="SemiBold" Foreground="White"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <TextBlock Text="{Binding TotalDuplicates, StringFormat='{}{0} Duplicates'}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
+                                        <!-- Need a converter for size or just raw -->
+                                        <!-- For simplicity, displaying raw bytes or use the helper in VM if accessible. 
+                                             Usually Models shouldn't have logic. 
+                                             Let's accept raw bytes or binding format logic later. -->
+                                    </StackPanel>
+                                </StackPanel>
+                                
+                                <Button Grid.Column="1" Content="✕" 
+                                        Command="{Binding $parent[UserControl].DataContext.DeleteSessionCommand}" 
+                                        CommandParameter="{Binding .}"
+                                        Background="Transparent" Foreground="Red" Padding="5"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Border>
+
+        <!-- Right: Details -->
+        <Border Grid.Column="1" Background="#1E1E2E" CornerRadius="8" Padding="20">
+            <Grid RowDefinitions="Auto, *">
+                 <TextBlock Text="Session Details" FontWeight="Bold" Foreground="White" Margin="0,0,0,10" FontSize="16"/>
+                 
+                 <TextBlock Grid.Row="1" Text="Select a session to view details" VerticalAlignment="Center" HorizontalAlignment="Center"
+                            IsVisible="{Binding SelectedSession, Converter={x:Static ObjectConverters.IsNull}}"
+                            Foreground="{DynamicResource TextSecondaryBrush}"/>
+
+                 <DataGrid Grid.Row="1" 
+                           ItemsSource="{Binding SelectedSession.Items}"
+                           IsVisible="{Binding SelectedSession, Converter={x:Static ObjectConverters.IsNotNull}}"
+                           AutoGenerateColumns="False"
+                           IsReadOnly="True"
+                           GridLinesVisibility="Horizontal"
+                           Background="Transparent"
+                           BorderThickness="0"
+                           HeadersVisibility="Column"
+                           RowBackground="Transparent">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="File Name" Binding="{Binding FileName}" Width="1.5*"/>
+                        <DataGridTextColumn Header="Path" Binding="{Binding FullPath}" Width="2*"/>
+                        <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="Auto"/>
+                    </DataGrid.Columns>
+                 </DataGrid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

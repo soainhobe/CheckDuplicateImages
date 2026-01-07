@@ -1,0 +1,153 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:CheckDuplicate.ViewModels"
+             xmlns:cv="using:CheckDuplicate.Converters"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="600"
+             x:Class="CheckDuplicate.Views.ResultsView"
+             x:DataType="vm:ResultsViewModel"
+             Background="{DynamicResource AppBackgroundBrush}">
+    
+    <UserControl.Resources>
+        <cv:PathToBitmapConverter x:Key="PathToBitmapConverter"/>
+        <cv:StringNotEmptyToBoolConverter x:Key="StringNotEmptyToBoolConverter"/>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <Style Selector="Button.primary">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBlueBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Button.secondary">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource TextSecondaryBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="12,6"/>
+        </Style>
+        <Style Selector="DataGridColumnHeader">
+            <Setter Property="Background" Value="#252535"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+            <Setter Property="Padding" Value="10"/>
+        </Style>
+        <Style Selector="DataGridRow">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
+         <!-- Highlight selected row -->
+        <Style Selector="DataGridRow:selected">
+             <Setter Property="Background" Value="#2A2A3C"/>
+        </Style>
+        
+        <!-- Hide Group Header if Key is Empty (for Single Files Level 2) -->
+        <!-- Highlight 'Single file' Group Header -->
+        <!-- Highlight 'Single file' Group Header -->
+        <Style Selector="DataGridRowGroupHeader" x:CompileBindings="False">
+            <Setter Property="Background" Value="#1E1E2E"/>
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="IsVisible" Value="{Binding Key, Converter={StaticResource StringNotEmptyToBoolConverter}}"/>
+        </Style>
+        
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto, Auto, *, Auto" Margin="20">
+        
+        <!-- Top Toolbar -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,20">
+            <Button Classes="primary" Content="Start New Scan" Command="{Binding StartNewScanCommand}">
+                 <Button.Content>
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                        <TextBlock Text="▶" VerticalAlignment="Center"/>
+                        <TextBlock Text="Start New Scan"/>
+                    </StackPanel>
+                 </Button.Content>
+            </Button>
+            
+            <Button Classes="secondary" Content="Scan Options" Command="{Binding OpenScanOptionsCommand}"/>
+            <!-- Delete All Duplicates button removed as requested -->
+            <Button Classes="secondary" Content="Export Report" Command="{Binding ExportReportCommand}"/>
+        </StackPanel>
+        
+        <!-- Header -->
+        <TextBlock Grid.Row="1" Text="Scan Results" FontSize="20" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,10"/>
+
+        <!-- Results DataGrid -->
+        <DataGrid Grid.Row="2" 
+                  ItemsSource="{Binding ItemsView}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  GridLinesVisibility="Horizontal"
+                  Background="Transparent"
+                  BorderThickness="0"
+                  HeadersVisibility="Column"
+                  RowBackground="Transparent"
+                  x:CompileBindings="False">
+            
+            <DataGrid.Columns>
+                <!-- File Name with Icon/Image logic -->
+                <DataGridTemplateColumn Header="File Name" Width="1.5*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                <!-- Default Icon if NOT Image -->
+                                <TextBlock Text="📄" Foreground="{DynamicResource PrimaryBlueBrush}"
+                                           IsVisible="{Binding !IsImage}" VerticalAlignment="Center" FontSize="16"/>
+                                
+                                <!-- Image Preview if IS Image -->
+                                <Border CornerRadius="4" ClipToBounds="True" Width="30" Height="30" 
+                                        IsVisible="{Binding IsImage}" Background="#2A2A3C">
+                                     <Image Source="{Binding ThumbnailTask^}" Stretch="UniformToFill"/>
+                                </Border>
+                                
+                                <TextBlock Text="{Binding FileName}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTextColumn Header="File Location" Binding="{Binding FileLocation}" Width="2*"/>
+                <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="Auto"/>
+                <DataGridTextColumn Header="Created Date" Binding="{Binding CreatedDate}" Width="Auto"/>
+                
+                <DataGridTemplateColumn Header="Actions" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <!-- Removed direct delete button -->
+                                <Button Content="..." Background="Transparent" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0">
+                                    <Button.Flyout>
+                                        <MenuFlyout>
+                                            <MenuItem Header="Open Folder" 
+                                                      Command="{Binding $parent[UserControl].DataContext.OpenFolderCommand}"
+                                                      CommandParameter="{Binding .}"/>
+                                            <Separator/>
+                                            <MenuItem Header="Delete File (Recycle Bin)" 
+                                                      Command="{Binding $parent[UserControl].DataContext.DeleteFileCommand}"
+                                                      CommandParameter="{Binding .}"
+                                                      Foreground="Red"/>
+                                        </MenuFlyout>
+                                    </Button.Flyout>
+                                </Button>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Bottom Bar -->
+        <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,20,0,0">
+            <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+            <!-- Custom ProgressBar look -->
+            <ProgressBar Grid.Column="0" Width="200" Value="{Binding ProgressValue}" Maximum="100" Height="4" Margin="0,25,0,0" Foreground="{DynamicResource PrimaryBlueBrush}" Background="#2A2A3C"/>
+            
+            <TextBlock Grid.Column="3" Text="{Binding SpaceSavedText}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" FontWeight="Bold"/>
+        </Grid>
+
+    </Grid>
+</UserControl>

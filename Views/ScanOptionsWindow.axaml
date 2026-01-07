@@ -1,0 +1,119 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:CheckDuplicate.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="600"
+        Width="700" Height="650"
+        x:Class="CheckDuplicate.Views.ScanOptionsWindow"
+        x:DataType="vm:ScanOptionsViewModel"
+        WindowStartupLocation="CenterOwner"
+        SystemDecorations="None"
+        Background="{DynamicResource AppBackgroundBrush}"
+        Icon="/Assets/Logo.ico"
+        Title="Scan Options">
+
+    <Border BorderBrush="#333344" BorderThickness="1">
+        <Grid RowDefinitions="Auto, *, Auto" Margin="20">
+            <!-- Header -->
+            <TextBlock Grid.Row="0" Text="Scan Options" FontSize="20" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,20"/>
+
+            <!-- Content -->
+            <ScrollViewer Grid.Row="1" Margin="0,0,0,10">
+                <StackPanel Spacing="20" Margin="0,0,10,0">
+                
+                    <!-- Folders Section -->
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Select Folders to Scan" Foreground="White" FontWeight="Medium"/>
+                        
+                        <Border Background="#151521" CornerRadius="4" BorderBrush="#333344" BorderThickness="1" Height="200">
+                            <TreeView ItemsSource="{Binding Folders}" 
+                                      SelectedItem="{Binding SelectedFolder}"
+                                      Background="Transparent"
+                                      BorderThickness="0">
+                                <TreeView.ItemTemplate>
+                                    <TreeDataTemplate ItemsSource="{Binding Children}">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <CheckBox IsChecked="{Binding IsChecked}" VerticalAlignment="Center"/>
+                                            <TextBlock Text="📁" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center" ToolTip.Tip="{Binding Path}"/>
+                                        </StackPanel>
+                                    </TreeDataTemplate>
+                                </TreeView.ItemTemplate>
+                            </TreeView>
+                        </Border>
+                        
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Button Classes="primary" Content="Add Folder" Width="100" Click="AddFolder_Click"/>
+                            <Button Content="Remove" Command="{Binding RemoveFolderCommand}" Background="#2A2A3C" Foreground="Gray" BorderThickness="0" CornerRadius="4" Padding="15,8"/>
+                        </StackPanel>
+                    </StackPanel>
+    
+                    <!-- File Types Section -->
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="File Types" Foreground="White" FontWeight="Medium"/>
+                        <Grid ColumnDefinitions="*, *" RowDefinitions="Auto, Auto, Auto">
+                            <CheckBox Grid.Column="0" Grid.Row="0" Content="Images (JPG, PNG, RAW)" IsChecked="{Binding CheckImages}" Margin="0,0,0,10"/>
+                            <CheckBox Grid.Column="1" Grid.Row="0" Content="Videos (MP4, MOV)" IsChecked="{Binding CheckVideos}" Margin="0,0,0,10"/>
+                            
+                            <CheckBox Grid.Column="0" Grid.Row="1" Content="Documents (PDF, DOCX, TXT)" IsChecked="{Binding CheckDocuments}" Margin="0,0,0,10"/>
+                            
+                            <!-- Mixed Checkbox and TextBox for Other -->
+                            <StackPanel Grid.Column="1" Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+                                <CheckBox Content="Other" IsChecked="{Binding CheckOther}" VerticalAlignment="Center"/>
+                                <TextBox Text="{Binding OtherTypes}" Watermark="Enter types here" Background="#151521" BorderThickness="1" BorderBrush="#333344" CornerRadius="4" Width="200"/>
+                            </StackPanel>
+                            
+                            <CheckBox Grid.Column="0" Grid.Row="2" Content="Music (MP3, WAV)" IsChecked="{Binding CheckMusic}"/>
+                        </Grid>
+                    </StackPanel>
+    
+                    <!-- Comparison Method Section -->
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Duplicate Check Method" Foreground="White" FontWeight="Medium"/>
+                        
+                        <WrapPanel Orientation="Horizontal" ItemWidth="300">
+                            <RadioButton Content="Content (CRC32/MD5)" IsChecked="{Binding UseContentComparison}"/>
+                            <RadioButton Content="Name and Size" IsChecked="{Binding UseNameAndSize}"/>
+                            <RadioButton Content="Advanced Image Scan" IsChecked="{Binding UseAdvancedImageComparison}" IsVisible="{Binding CheckImages}"/>
+                            <RadioButton Content="Auto (Smart)" IsChecked="{Binding UseAutoComparison}"/>
+                        </WrapPanel>
+                        
+                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,5,0,0">
+                             <TextBlock Text="Comparison strength:" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                             <ComboBox SelectedIndex="{Binding ComparisonStrengthIndex}" Width="150" Background="#151521" BorderBrush="#333344">
+                                 <ComboBoxItem>Strict</ComboBoxItem>
+                                 <ComboBoxItem>Loose</ComboBoxItem>
+                             </ComboBox>
+                        </StackPanel>
+                    </StackPanel>
+    
+                </StackPanel>
+            </ScrollViewer>
+            
+            <!-- Footer Buttons -->
+            <Border Grid.Row="2" BorderBrush="#333344" BorderThickness="0,1,0,0" Margin="-20,0,-20,-20" Padding="20" Background="#1E1E2E">
+                <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+                    <Button Classes="primary" Content="Save Options" Command="{Binding SaveCommand}" Width="120"/>
+                    <Button Content="Cancel" Command="{Binding CancelCommand}" Background="#2A2A3C" Foreground="White" BorderThickness="0" CornerRadius="4" Padding="15,8"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
+
+    <Window.Styles>
+        <Style Selector="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        </Style>
+         <Style Selector="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        </Style>
+        <Style Selector="Button.primary">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBlueBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+    </Window.Styles>
+</Window>

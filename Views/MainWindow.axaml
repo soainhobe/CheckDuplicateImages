@@ -1,0 +1,78 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:CheckDuplicate.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="700"
+        x:Class="CheckDuplicate.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/Logo.ico"
+        Title="Duplicate File Manager"
+        Background="{DynamicResource AppBackgroundBrush}"
+        TransparencyLevelHint="Mica"
+        ExtendClientAreaToDecorationsHint="True">
+
+    <Window.Styles>
+        <Style Selector="Button.NavBtn">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="FontSize" Value="16"/> <!-- Increased Font Size for Buttons -->
+        </Style>
+        <Style Selector="Button.NavBtn:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1A1A25"/>
+        </Style>
+        <!-- Active State -->
+        <Style Selector="Button.NavBtn[Tag=True]">
+            <Setter Property="Background" Value="#2A2A3C"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
+        <Style Selector="Button.NavBtn[Tag=True]:pointerover /template/ ContentPresenter">
+             <Setter Property="Background" Value="#2A2A3C"/>
+        </Style>
+    </Window.Styles>
+
+    <Grid ColumnDefinitions="200,*"> <!-- Reduced Sidebar Width from 250 to 200 -->
+        
+        <!-- Sidebar -->
+        <Border Grid.Column="0" Background="{DynamicResource SidebarBackgroundBrush}" Padding="20" PointerPressed="OnPointerPressed">
+             <Grid RowDefinitions="Auto, *">
+                 <StackPanel Grid.Row="0" Spacing="20">
+                     <!-- Window Controls Placeholder if needed (top margin for drag area) -->
+                     <TextBlock Text="Duplicate File Manager" Foreground="White" FontWeight="Bold" Margin="0,10,0,20" HorizontalAlignment="Center" FontSize="18" TextWrapping="Wrap" TextAlignment="Center"/> <!-- Increased Title Font Size -->
+                     
+                     <Button Classes="NavBtn" Command="{Binding NavigateToHomeCommand}" Tag="{Binding IsHomeActive}">
+                         <StackPanel Orientation="Horizontal" Spacing="10">
+                              <TextBlock Text="🏠"/>
+                              <TextBlock Text="Home"/>
+                         </StackPanel>
+                     </Button>
+
+                      <Button Classes="NavBtn" Command="{Binding NavigateToHistoryCommand}" Tag="{Binding IsHistoryActive}">
+                         <StackPanel Orientation="Horizontal" Spacing="10">
+                              <TextBlock Text="🕒"/>
+                              <TextBlock Text="History"/>
+                         </StackPanel>
+                     </Button>
+                 </StackPanel>
+
+                 <Button Grid.Row="1" Classes="NavBtn" Command="{Binding NavigateToAboutCommand}" VerticalAlignment="Bottom" Tag="{Binding IsAboutActive}">
+                     <StackPanel Orientation="Horizontal" Spacing="10">
+                          <TextBlock Text="ℹ"/>
+                          <TextBlock Text="About"/>
+                     </StackPanel>
+                 </Button>
+             </Grid>
+        </Border>
+
+        <!-- Content Area -->
+        <Border Grid.Column="1" Background="{DynamicResource AppBackgroundBrush}" PointerPressed="OnPointerPressed">
+            <TransitioningContentControl Content="{Binding CurrentPage}" Padding="0"/>
+        </Border>
+    </Grid>
+
+</Window>
