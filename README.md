@@ -41,7 +41,7 @@ Unlike simple byte-to-byte comparison, our "Advanced Image Scan" uses a sophisti
 ### Run Locally
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/CheckDuplicate.git
+git clone https://github.com/soainhobe/CheckDuplicateImages.git
 cd CheckDuplicate
 
 # Run in Debug mode
